@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <title>Test result</title>
+</head>
+<body>
+<div th:replace="~{layout :: navbar}"></div>
+<main class="container">
+<p><a th:href="@{/lists/{id}(id=${listId})}">&larr; Back to list</a></p>
+<h1>Result: <span th:text="${listName}"></span></h1>
+
+<div th:replace="~{question :: feedback}"></div>
+
+<p th:text="'Score: ' + ${correct} + ' / ' + ${total}"></p>
+
+<p th:if="${missed.isEmpty()}">No words missed.</p>
+
+<div th:unless="${missed.isEmpty()}">
+    <h2>Missed words</h2>
+    <table>
+        <thead>
+        <tr><th>Word</th><th>Answer</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="m : ${missed}">
+            <td th:text="${m.prompt}"></td>
+            <td th:text="${m.answer}"></td>
+        </tr>
+        </tbody>
+    </table>
+    <p><a th:href="@{/lists/{id}/test/retake-missed(id=${listId})}">Retake missed words only</a></p>
+</div>
+</main>
+</body>
+</html>

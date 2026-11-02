@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <title>Test</title>
+</head>
+<body>
+<div th:replace="~{layout :: navbar}"></div>
+<main class="container">
+<p><a th:href="@{/lists/{id}(id=${listId})}">&larr; Back to list</a></p>
+<h1>Test: <span th:text="${listName}"></span></h1>
+
+<div th:fragment="feedback" th:if="${answerCorrect != null}">
+    <p th:if="${answerCorrect}" class="correct">
+        Correct: <span th:text="${answerPrompt}"></span> = <span th:text="${answerExpected}"></span>
+    </p>
+    <p th:unless="${answerCorrect}" class="wrong">
+        Wrong. You wrote "<span th:text="${answerGiven}"></span>".
+        <span th:text="${answerPrompt}"></span> = <span th:text="${answerExpected}"></span>
+    </p>
+</div>
+
+<div th:replace="~{this :: feedback}"></div>
+
+<p th:text="'Question ' + ${position} + ' of ' + ${total}"></p>
+<p class="prompt" th:text="${prompt}"></p>
+
+<form method="post" th:action="@{/lists/{id}/test/answer(id=${listId})}">
+    <label>Your answer
+        <input type="text" name="answer" autocomplete="off" autofocus>
+    </label>
+    <button type="submit">Check</button>
+</form>
+</main>
+</body>
+</html>

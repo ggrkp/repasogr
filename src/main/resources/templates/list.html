@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <title th:text="${list.name}">List</title>
+</head>
+<body>
+<div th:replace="~{layout :: navbar}"></div>
+<main class="container">
+<h1 th:text="${list.name}">List</h1>
+
+<p th:if="${message}" th:text="${message}" class="message"></p>
+<p th:if="${error}" th:text="${error}" class="error"></p>
+
+<form method="post" th:action="@{/lists/{id}/rename(id=${list.id})}" class="inline-form">
+    <label>Rename list
+        <input type="text" name="name" th:value="${list.name}">
+    </label>
+    <button type="submit">Rename</button>
+</form>
+
+<h2>Add a word</h2>
+<form method="get" th:action="@{/lists/{id}(id=${list.id})}">
+    <label>Greek or Spanish word
+        <input type="text" name="word" th:value="${word}">
+    </label>
+    <button type="submit">Search dictionary</button>
+</form>
+
+<p th:if="${!word.isEmpty() and matches.isEmpty()}">
+    No dictionary entry for "<span th:text="${word}"></span>".
+</p>
+
+<table th:unless="${matches.isEmpty()}">
+    <thead>
+    <tr><th>Greek</th><th>Spanish</th><th></th></tr>
+    </thead>
+    <tbody>
+    <tr th:each="match : ${matches}">
+        <td th:text="${match.greek}"></td>
+        <td th:text="${match.spanish}"></td>
+        <td>
+            <form method="post" th:action="@{/lists/{id}/items(id=${list.id})}">
+                <input type="hidden" name="greek" th:value="${match.greek}">
+                <input type="hidden" name="spanish" th:value="${match.spanish}">
+                <button type="submit">Add</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<h2>Test yourself</h2>
+<p th:if="${list.items.isEmpty()}">Add words before you can test this list.</p>
+<p th:unless="${list.items.isEmpty()}">
+    <a th:href="@{/lists/{id}/test(id=${list.id},direction='EL_TO_ES')}">Greek to Spanish</a> |
+    <a th:href="@{/lists/{id}/test(id=${list.id},direction='ES_TO_EL')}">Spanish to Greek</a>
+</p>
+
+<h2>Words in this list</h2>
+<p th:if="${list.items.isEmpty()}">No words yet.</p>
+
+<table th:unless="${list.items.isEmpty()}">
+    <thead>
+    <tr><th>Greek</th><th>Spanish</th><th></th></tr>
+    </thead>
+    <tbody>
+    <tr th:each="item : ${list.items}">
+        <td th:text="${item.greek}"></td>
+        <td th:text="${item.spanish}"></td>
+        <td>
+            <form method="post" th:action="@{/lists/{id}/items/{itemId}/delete(id=${list.id},itemId=${item.id})}">
+                <button type="submit">Remove</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</main>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <title>Word lists</title>
+</head>
+<body>
+<div th:replace="~{layout :: navbar}"></div>
+<main class="container">
+<h1>Word lists</h1>
+
+<p th:if="${message}" th:text="${message}" class="message"></p>
+<p th:if="${error}" th:text="${error}" class="error"></p>
+
+<form method="post" th:action="@{/lists}">
+    <label>New list name
+        <input type="text" name="name" th:value="${name}">
+    </label>
+    <button type="submit">Create list</button>
+</form>
+
+<p th:if="${lists.isEmpty()}">No lists yet.</p>
+
+<ul>
+    <li th:each="wordList : ${lists}">
+        <a th:href="@{/lists/{id}(id=${wordList.id})}" th:text="${wordList.name}"></a>
+        <form method="post" th:action="@{/lists/{id}/delete(id=${wordList.id})}" style="display:inline"
+              th:onsubmit="return confirm('Delete this list and all its words?')">
+            <button type="submit">Delete list</button>
+        </form>
+    </li>
+</ul>
+</main>
+</body>
+</html>
