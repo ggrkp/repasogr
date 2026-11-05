@@ -29,23 +29,40 @@
     <button type="submit">Search dictionary</button>
 </form>
 
-<p th:if="${!word.isEmpty() and matches.isEmpty()}">
-    No dictionary entry for "<span th:text="${word}"></span>".
-</p>
+<div th:if="${!word.isEmpty() and matches.isEmpty()}">
+    <p>No dictionary entry for "<span th:text="${word}"></span>". Enter the pair yourself:</p>
+    <form method="post" th:action="@{/lists/{id}/items/custom(id=${list.id})}" class="inline-form">
+        <label>Greek
+            <input type="text" name="greek" th:value="${manualGreek}">
+        </label>
+        <label>Spanish
+            <input type="text" name="spanish" th:value="${manualSpanish}">
+        </label>
+        <button type="submit">Add my own word</button>
+    </form>
+</div>
 
 <table th:unless="${matches.isEmpty()}">
     <thead>
-    <tr><th>Greek</th><th>Spanish</th><th></th></tr>
+    <tr><th>Greek</th><th>Spanish</th><th>From</th><th></th><th>Your translation</th></tr>
     </thead>
     <tbody>
     <tr th:each="match : ${matches}">
-        <td th:text="${match.greek}"></td>
-        <td th:text="${match.spanish}"></td>
+        <td th:text="${match.greek()}"></td>
+        <td th:text="${match.spanish()}"></td>
+        <td th:text="${match.ownWord() ? 'My words' : 'Dictionary'}"></td>
         <td>
-            <form method="post" th:action="@{/lists/{id}/items(id=${list.id})}">
-                <input type="hidden" name="greek" th:value="${match.greek}">
-                <input type="hidden" name="spanish" th:value="${match.spanish}">
+            <form method="post" th:action="${match.ownWord()} ? @{/lists/{id}/items/custom(id=${list.id})} : @{/lists/{id}/items(id=${list.id})}">
+                <input type="hidden" name="greek" th:value="${match.greek()}">
+                <input type="hidden" name="spanish" th:value="${match.spanish()}">
                 <button type="submit">Add</button>
+            </form>
+        </td>
+        <td>
+            <form method="post" th:action="@{/lists/{id}/items/custom(id=${list.id})}" class="inline-form">
+                <input type="hidden" name="greek" th:value="${match.greek()}">
+                <input type="text" name="spanish" placeholder="your Spanish" aria-label="Your Spanish translation">
+                <button type="submit">Add mine</button>
             </form>
         </td>
     </tr>
@@ -64,14 +81,38 @@
 
 <table th:unless="${list.items.isEmpty()}">
     <thead>
-    <tr><th>Greek</th><th>Spanish</th><th></th></tr>
+    <tr><th>Greek and Spanish (edit in place)</th><th>More Greek translations (up to 3 in total)</th><th></th></tr>
     </thead>
     <tbody>
     <tr th:each="item : ${list.items}">
-        <td th:text="${item.greek}"></td>
-        <td th:text="${item.spanish}"></td>
         <td>
-            <form method="post" th:action="@{/lists/{id}/items/{itemId}/delete(id=${list.id},itemId=${item.id})}">
+            <form method="post" th:action="@{/lists/{id}/items/{itemId}/edit(id=${list.id},itemId=${item.id})}" class="inline-form">
+                <input type="text" name="greek" th:value="${item.greek}" aria-label="Greek">
+                <input type="text" name="spanish" th:value="${item.spanish}" aria-label="Spanish">
+                <button type="submit">Save</button>
+            </form>
+        </td>
+        <td>
+            <ol>
+                <li th:each="translation, stat : ${item.extraGreek}">
+                    <span th:text="${translation}"></span>
+                    <form method="post" class="inline-form"
+                          th:action="@{/lists/{id}/items/{itemId}/greek-translations/{index}/delete(id=${list.id},itemId=${item.id},index=${stat.index})}"
+                          th:onsubmit="return confirm('Remove this Greek translation?')">
+                        <button type="submit">Remove</button>
+                    </form>
+                </li>
+            </ol>
+            <form method="post" th:if="${item.greekTranslations.size() lt 3}"
+                  th:action="@{/lists/{id}/items/{itemId}/greek-translations(id=${list.id},itemId=${item.id})}"
+                  class="inline-form">
+                <input type="text" name="text" placeholder="Another Greek word" aria-label="Another Greek translation">
+                <button type="submit">Add translation</button>
+            </form>
+        </td>
+        <td>
+            <form method="post" th:action="@{/lists/{id}/items/{itemId}/delete(id=${list.id},itemId=${item.id})}"
+                  th:onsubmit="return confirm('Remove this word from the list?')">
                 <button type="submit">Remove</button>
             </form>
         </td>

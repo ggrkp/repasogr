@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
-@Import({WordListService.class, DictionaryService.class, TeiDictionaryParser.class})
+@Import({WordListService.class, DictionaryService.class, TeiDictionaryParser.class, OwnWordService.class})
 class WordListServiceTest {
 
     private static final String TEI = """
@@ -45,6 +45,9 @@ class WordListServiceTest {
 
     @Autowired
     EntityManager entityManager;
+
+    @Autowired
+    OwnWordService ownWords;
 
     @TempDir
     Path dir;
@@ -101,6 +104,172 @@ class WordListServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("\"σπίτι\" = \"perro\" is not in the dictionary.");
         assertThat(service.findWithItems(list.getId()).orElseThrow().getItems()).isEmpty();
+    }
+
+    @Test
+    void addsOwnPairThatIsNotInTheDictionary() {
+        WordList list = service.create("Own");
+
+        ListItem item = service.addCustomItem(list.getId(), "  ψωμί ", " pan ");
+
+        assertThat(item.getGreek()).isEqualTo("ψωμί");
+        assertThat(item.getSpanish()).isEqualTo("pan");
+        assertThat(service.findWithItems(list.getId()).orElseThrow().getItems()).hasSize(1);
+    }
+
+    @Test
+    void ownPairCannotBeAddedTwice() {
+        WordList list = service.create("Own twice");
+        service.addCustomItem(list.getId(), "ψωμί", "pan");
+
+        assertThatThrownBy(() -> service.addCustomItem(list.getId(), "ψωμί", "pan"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("This word pair is already in the list.");
+    }
+
+    @Test
+    void pairDifferingOnlyInCaseOrAccentsIsTreatedAsDuplicate() {
+        WordList list = service.create("Accents");
+        service.addCustomItem(list.getId(), "ψωμί", "pan");
+
+        assertThatThrownBy(() -> service.addCustomItem(list.getId(), "ΨΩΜΙ", "Pan"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("This word pair is already in the list.");
+        service.addItem(list.getId(), "σπίτι", "hogar");
+        assertThatThrownBy(() -> service.addItem(list.getId(), "σπιτι", "Hogar"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("This word pair is already in the list.");
+    }
+
+    @Test
+    void editingIntoAnAccentVariantOfAnotherWordIsRejected() {
+        WordList list = service.create("Edit accents");
+        service.addCustomItem(list.getId(), "ψωμί", "pan");
+        ListItem other = service.addCustomItem(list.getId(), "γάτα", "gato");
+
+        assertThatThrownBy(() -> service.updateItem(list.getId(), other.getId(), "ΨΩΜΙ", "PAN"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("This word pair is already in the list.");
+    }
+
+    @Test
+    void ownPairNeedsBothWords() {
+        WordList list = service.create("Own blank");
+
+        assertThatThrownBy(() -> service.addCustomItem(list.getId(), "ψωμί", "  "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Both the Greek and the Spanish word are required.");
+    }
+
+    @Test
+    void addsExtraGreekTranslationsUpToThreeInTotal() {
+        WordList list = service.create("Translations");
+        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
+        entityManager.flush(); // assign the id, as a committed request would have
+
+        service.addGreekTranslation(list.getId(), item.getId(), " οικία ");
+        service.addGreekTranslation(list.getId(), item.getId(), "σπιτάκι");
+
+        ListItem stored = service.findWithItems(list.getId()).orElseThrow().getItems().get(0);
+        assertThat(stored.getGreekTranslations()).containsExactly("σπίτι", "οικία", "σπιτάκι");
+        assertThat(stored.getExtraGreek()).containsExactly("οικία", "σπιτάκι");
+    }
+
+    @Test
+    void fourthGreekTranslationIsRejected() {
+        WordList list = service.create("Four");
+        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
+        entityManager.flush();
+        service.addGreekTranslation(list.getId(), item.getId(), "οικία");
+        service.addGreekTranslation(list.getId(), item.getId(), "σπιτάκι");
+
+        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), item.getId(), "τέσσερα"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Each Spanish word can have up to 3 Greek translations.");
+    }
+
+    @Test
+    void duplicateGreekTranslationIsRejected() {
+        WordList list = service.create("Dup translation");
+        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
+        entityManager.flush();
+
+        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), item.getId(), "ΣΠΙΤΙ"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That Greek translation is already listed for this word.");
+    }
+
+    @Test
+    void blankGreekTranslationIsRejected() {
+        WordList list = service.create("Blank translation");
+        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
+        entityManager.flush();
+
+        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), item.getId(), "   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("The Greek translation cannot be blank.");
+    }
+
+    @Test
+    void removesExtraGreekTranslationByPosition() {
+        WordList list = service.create("Remove translation");
+        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
+        entityManager.flush();
+        service.addGreekTranslation(list.getId(), item.getId(), "οικία");
+        service.addGreekTranslation(list.getId(), item.getId(), "σπιτάκι");
+
+        service.removeGreekTranslation(list.getId(), item.getId(), 0);
+
+        ListItem stored = service.findWithItems(list.getId()).orElseThrow().getItems().get(0);
+        assertThat(stored.getGreekTranslations()).containsExactly("σπίτι", "σπιτάκι");
+    }
+
+    @Test
+    void greekTranslationOnWordNotInListIsRejected() {
+        WordList list = service.create("No word");
+
+        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), 424_242L, "ένα"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That word is not in this list.");
+    }
+
+    @Test
+    void customTranslationIsAlsoSavedAsOwnWordAndFoundElsewhere() {
+        WordList first = service.create("Primera");
+        WordList second = service.create("Segunda");
+
+        service.addCustomItem(first.getId(), "ψωμί", "pan");
+
+        assertThat(service.findWithItems(first.getId()).orElseThrow().getItems()).hasSize(1);
+        assertThat(ownWords.findMatches("pan")).extracting(w -> w.getGreek()).containsExactly("ψωμί");
+        assertThat(service.findDictionaryMatches("ψωμι"))
+                .containsExactly(new WordListService.WordMatch("ψωμί", "pan", true));
+
+        service.addCustomItem(second.getId(), "ψωμί", "pan"); // not a problem: a second list, same pair
+        assertThat(service.findWithItems(second.getId()).orElseThrow().getItems()).hasSize(1);
+        assertThat(ownWords.findMatches("pan")).hasSize(1);
+    }
+
+    @Test
+    void searchListsDictionaryPairsBeforeOwnWordsWithoutDuplicates() {
+        service.addCustomItem(service.create("Own").getId(), "σπίτι", "hogar");
+        service.addCustomItem(service.create("Own2").getId(), "σπίτι", "vivienda");
+
+        assertThat(service.findDictionaryMatches("σπίτι"))
+                .containsExactly(
+                        new WordListService.WordMatch("σπίτι", "casa", false),
+                        new WordListService.WordMatch("σπίτι", "hogar", false),
+                        new WordListService.WordMatch("σπίτι", "vivienda", true));
+    }
+
+    @Test
+    void ownWordThatIsAlsoInDictionaryIsShownOnce() {
+        service.addCustomItem(service.create("Dup").getId(), "σπίτι", "casa");
+
+        assertThat(service.findDictionaryMatches("σπίτι"))
+                .containsExactly(
+                        new WordListService.WordMatch("σπίτι", "casa", false),
+                        new WordListService.WordMatch("σπίτι", "hogar", false));
     }
 
     @Test
@@ -171,6 +340,69 @@ class WordListServiceTest {
         assertThat(entityManager.createQuery("select count(i) from ListItem i", Long.class).getSingleResult())
                 .isZero();
         assertThat(dictionary.count()).isEqualTo(dictionaryBefore);
+    }
+
+    @Test
+    void filtersListsByNameIgnoringAccentsAndCase() {
+        service.create("Verbos irregulares");
+        service.create("Casa");
+        service.create("Colores");
+
+        assertThat(service.findFiltered("VERB", "name")).extracting(WordList::getName)
+                .containsExactly("Verbos irregulares");
+        assertThat(service.findFiltered("", "name")).extracting(WordList::getName)
+                .containsExactly("Casa", "Colores", "Verbos irregulares");
+    }
+
+    @Test
+    void sortsByNumberOfWordsWhenAsked() {
+        service.create("Uno");
+        WordList two = service.create("Dos");
+        service.addCustomItem(two.getId(), "σπίτι", "casa");
+        service.addCustomItem(two.getId(), "γάτα", "gato");
+
+        assertThat(service.findFiltered("", "words")).extracting(WordList::getName)
+                .containsExactly("Dos", "Uno");
+    }
+
+    @Test
+    void editsWordInListWithoutChangingOtherLists() {
+        WordList list = service.create("Editar");
+        WordList other = service.create("Otra");
+        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
+        service.addCustomItem(other.getId(), "σπίτι", "casa"); // same pair in another list
+        entityManager.flush();
+
+        service.updateItem(list.getId(), item.getId(), "  οικία ", "hogar");
+
+        ListItem stored = service.findWithItems(list.getId()).orElseThrow().getItems().get(0);
+        assertThat(stored.getGreek()).isEqualTo("οικία");
+        assertThat(stored.getSpanish()).isEqualTo("hogar");
+        assertThat(service.findWithItems(other.getId()).orElseThrow().getItems().get(0).getSpanish()).isEqualTo("casa");
+    }
+
+    @Test
+    void editRejectsBlankAndDuplicatePairs() {
+        WordList list = service.create("Editar dos");
+        ListItem first = service.addItem(list.getId(), "σπίτι", "casa");
+        service.addItem(list.getId(), "γάτα", "gato");
+        entityManager.flush();
+
+        assertThatThrownBy(() -> service.updateItem(list.getId(), first.getId(), " ", "casa"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Both the Greek and the Spanish word are required.");
+        assertThatThrownBy(() -> service.updateItem(list.getId(), first.getId(), "γάτα", "gato"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("This word pair is already in the list.");
+    }
+
+    @Test
+    void editRejectsWordNotInList() {
+        WordList list = service.create("Sin palabra");
+
+        assertThatThrownBy(() -> service.updateItem(list.getId(), 424_242L, "σπίτι", "casa"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("That word is not in this list.");
     }
 
     @Test

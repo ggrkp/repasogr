@@ -21,11 +21,28 @@
     <button type="submit">Create list</button>
 </form>
 
-<p th:if="${lists.isEmpty()}">No lists yet.</p>
+<h2>Your lists</h2>
+<form method="get" th:action="@{/lists}" class="inline-form">
+    <label>Filter by name
+        <input type="text" name="q" th:value="${q}">
+    </label>
+    <label>Sort by
+        <select name="sort">
+            <option value="name" th:selected="${sort == 'name'}">Name (A–Z)</option>
+            <option value="words" th:selected="${sort == 'words'}">Most words first</option>
+        </select>
+    </label>
+    <button type="submit">Apply</button>
+    <a th:if="${!q.isEmpty() or sort != 'name'}" th:href="@{/lists}">Reset</a>
+</form>
+
+<p th:if="${lists.isEmpty() and q.isEmpty()}">No lists yet.</p>
+<p th:if="${lists.isEmpty() and !q.isEmpty()}">No lists match "<span th:text="${q}"></span>".</p>
 
 <ul>
     <li th:each="wordList : ${lists}">
         <a th:href="@{/lists/{id}(id=${wordList.id})}" th:text="${wordList.name}"></a>
+        <span class="muted" th:text="'(' + ${wordList.items.size()} + (${wordList.items.size() == 1} ? ' word)' : ' words)')"></span>
         <form method="post" th:action="@{/lists/{id}/delete(id=${wordList.id})}" style="display:inline"
               th:onsubmit="return confirm('Delete this list and all its words?')">
             <button type="submit">Delete list</button>

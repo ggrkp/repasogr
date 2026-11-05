@@ -1,8 +1,8 @@
 package com.gingy.repaso.gr.controller;
 
-import com.gingy.repaso.gr.domain.DictionaryEntry;
 import com.gingy.repaso.gr.domain.WordList;
 import com.gingy.repaso.gr.service.WordListService;
+import com.gingy.repaso.gr.service.WordListService.WordMatch;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -39,7 +39,7 @@ class ListControllerTest {
 
     @Test
     void showsExistingLists() throws Exception {
-        given(service.findAll()).willReturn(List.of(new WordList("Verbos")));
+        given(service.findFiltered("", "name")).willReturn(List.of(new WordList("Verbos")));
 
         mvc.perform(get("/lists"))
                 .andExpect(status().isOk())
@@ -98,6 +98,73 @@ class ListControllerTest {
     }
 
     @Test
+    void addsOwnItemAndRedirectsToList() throws Exception {
+        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
+
+        mvc.perform(post("/lists/1/items/custom").param("greek", "ψωμί").param("spanish", "pan"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/lists/1"))
+                .andExpect(flash().attribute("message", "Word added."));
+
+        verify(service).addCustomItem(1L, "ψωμί", "pan");
+    }
+
+    @Test
+    void noDictionaryMatchShowsOwnWordFormPrefilledWithSearch() throws Exception {
+        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
+        given(service.findDictionaryMatches(anyString())).willReturn(List.of());
+
+        mvc.perform(get("/lists/1").param("word", "ψωμί"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/items/custom")))
+                .andExpect(content().string(containsString("value=\"ψωμί\"")));
+    }
+
+    @Test
+    void editsListWordAndRedirectsToList() throws Exception {
+        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
+
+        mvc.perform(post("/lists/1/items/5/edit").param("greek", "σπίτι").param("spanish", "hogar"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/lists/1"))
+                .andExpect(flash().attribute("message", "Word updated."));
+
+        verify(service).updateItem(1L, 5L, "σπίτι", "hogar");
+    }
+
+    @Test
+    void listsPageFiltersAndSortsByQueryAndSort() throws Exception {
+        given(service.findFiltered("ver", "words")).willReturn(List.of(new WordList("Verbos")));
+
+        mvc.perform(get("/lists").param("q", "ver").param("sort", "words"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Verbos")))
+                .andExpect(content().string(containsString("value=\"ver\"")));
+    }
+
+    @Test
+    void addsGreekTranslationAndRedirectsToList() throws Exception {
+        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
+
+        mvc.perform(post("/lists/1/items/5/greek-translations").param("text", "οικία"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/lists/1"));
+
+        verify(service).addGreekTranslation(1L, 5L, "οικία");
+    }
+
+    @Test
+    void removesGreekTranslationByIndex() throws Exception {
+        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
+
+        mvc.perform(post("/lists/1/items/5/greek-translations/2/delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/lists/1"));
+
+        verify(service).removeGreekTranslation(1L, 5L, 2);
+    }
+
+    @Test
     void rejectedItemShowsErrorAndKeepsInput() throws Exception {
         given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
         doThrow(new IllegalArgumentException("\"σπίτι\" = \"perro\" is not in the dictionary."))
@@ -113,14 +180,15 @@ class ListControllerTest {
     void searchShowsDictionaryMatchesWithAddButtons() throws Exception {
         given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
         given(service.findDictionaryMatches("σπίτι")).willReturn(List.of(
-                new DictionaryEntry("test", "σπίτι", "casa"),
-                new DictionaryEntry("test", "σπίτι", "hogar")));
+                new WordMatch("σπίτι", "casa", false),
+                new WordMatch("σπίτι", "hogar", true)));
 
         mvc.perform(get("/lists/1").param("word", "σπίτι"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("casa")))
                 .andExpect(content().string(containsString("hogar")))
-                .andExpect(content().string(containsString("name=\"spanish\" value=\"casa\"")));
+                .andExpect(content().string(containsString("name=\"spanish\" value=\"casa\"")))
+                .andExpect(content().string(containsString("My words")));
     }
 
     @Test

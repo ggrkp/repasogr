@@ -2,6 +2,7 @@ package com.gingy.repaso.gr.controller;
 
 import com.gingy.repaso.gr.domain.WordList;
 import com.gingy.repaso.gr.service.WordListService;
+import com.gingy.repaso.gr.service.WordListService.WordMatch;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,10 +15,13 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @Controller
 @RequestMapping("/lists")
 public class ListController {
+
+    private static final Pattern GREEK_LETTER = Pattern.compile("\\p{IsGreek}");
 
     private final WordListService wordListService;
 
@@ -26,8 +30,13 @@ public class ListController {
     }
 
     @GetMapping
-    public String showLists(Model model) {
-        model.addAttribute("lists", wordListService.findAll());
+    public String showLists(@RequestParam(name = "q", required = false) String query,
+                            @RequestParam(name = "sort", defaultValue = "name") String sort,
+                            Model model) {
+        String q = query == null ? "" : query.trim();
+        model.addAttribute("lists", wordListService.findFiltered(q, sort));
+        model.addAttribute("q", q);
+        model.addAttribute("sort", "words".equals(sort) ? "words" : "name");
         return "lists";
     }
 
@@ -53,7 +62,12 @@ public class ListController {
         String query = word == null ? "" : word.trim();
         model.addAttribute("list", list);
         model.addAttribute("word", query);
-        model.addAttribute("matches", query.isEmpty() ? List.of() : wordListService.findDictionaryMatches(query));
+        List<WordMatch> matches = query.isEmpty() ? List.of() : wordListService.findDictionaryMatches(query);
+        model.addAttribute("matches", matches);
+        // Pre-fill the manual form: the searched word goes in the Greek or Spanish box by its script.
+        boolean greekQuery = GREEK_LETTER.matcher(query).find();
+        model.addAttribute("manualGreek", greekQuery ? query : "");
+        model.addAttribute("manualSpanish", greekQuery || query.isEmpty() ? "" : query);
         return "list";
     }
 
@@ -65,6 +79,66 @@ public class ListController {
         findListOr404(id);
         try {
             wordListService.addItem(id, greek, spanish);
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/lists/" + id;
+    }
+
+    /** Adds a pair the user typed, used when the dictionary has no entry for the word. */
+    @PostMapping("/{id}/items/custom")
+    public String addCustomItem(@PathVariable Long id,
+                                @RequestParam(name = "greek", defaultValue = "") String greek,
+                                @RequestParam(name = "spanish", defaultValue = "") String spanish,
+                                RedirectAttributes redirect) {
+        findListOr404(id);
+        try {
+            wordListService.addCustomItem(id, greek, spanish);
+            redirect.addFlashAttribute("message", "Word added.");
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/lists/" + id;
+    }
+
+    @PostMapping("/{id}/items/{itemId}/greek-translations")
+    public String addGreekTranslation(@PathVariable Long id,
+                                @PathVariable Long itemId,
+                                @RequestParam(name = "text", defaultValue = "") String text,
+                                RedirectAttributes redirect) {
+        findListOr404(id);
+        try {
+            wordListService.addGreekTranslation(id, itemId, text);
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/lists/" + id;
+    }
+
+    @PostMapping("/{id}/items/{itemId}/greek-translations/{index}/delete")
+    public String removeGreekTranslation(@PathVariable Long id,
+                                   @PathVariable Long itemId,
+                                   @PathVariable int index,
+                                   RedirectAttributes redirect) {
+        findListOr404(id);
+        try {
+            wordListService.removeGreekTranslation(id, itemId, index);
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        }
+        return "redirect:/lists/" + id;
+    }
+
+    @PostMapping("/{id}/items/{itemId}/edit")
+    public String editItem(@PathVariable Long id,
+                           @PathVariable Long itemId,
+                           @RequestParam(name = "greek", defaultValue = "") String greek,
+                           @RequestParam(name = "spanish", defaultValue = "") String spanish,
+                           RedirectAttributes redirect) {
+        findListOr404(id);
+        try {
+            wordListService.updateItem(id, itemId, greek, spanish);
+            redirect.addFlashAttribute("message", "Word updated.");
         } catch (IllegalArgumentException e) {
             redirect.addFlashAttribute("error", e.getMessage());
         }
