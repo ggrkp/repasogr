@@ -135,7 +135,7 @@ class TestFlowTest {
                 .andExpect(redirectedUrl("/lists/" + listId + "/test/question"));
         mvc.perform(get("/lists/{id}/test/question", listId).session(session))
                 .andExpect(content().string(containsString(missedWord)))
-                .andExpect(content().string(containsString("Question 1 of 1")));
+                .andExpect(content().string(containsString("1 of 1")));
     }
 
     @Test

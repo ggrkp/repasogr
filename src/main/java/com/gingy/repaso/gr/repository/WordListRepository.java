@@ -9,10 +9,11 @@ import java.util.Optional;
 
 public interface WordListRepository extends JpaRepository<WordList, Long> {
 
+    @EntityGraph(attributePaths = "items")
     List<WordList> findAllByOrderByNameAsc();
 
     boolean existsByName(String name);
 
-    @EntityGraph(attributePaths = "items")
+    @EntityGraph(attributePaths = {"items", "items.extraGreek"})
     Optional<WordList> findWithItemsById(Long id);
 }

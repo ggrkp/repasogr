@@ -24,8 +24,14 @@
 
 <div th:replace="~{this :: feedback}"></div>
 
-<p th:text="'Question ' + ${position} + ' of ' + ${total}"></p>
+<p class="progress-text" th:text="${position} + ' of ' + ${total}"></p>
+<progress class="progress" th:value="${position - 1}" th:max="${total}" aria-label="Test progress"></progress>
 <p class="prompt" th:text="${prompt}"></p>
+
+<p th:if="${hint != null}" class="hint">Starts with: <strong th:text="${hint}"></strong></p>
+<form th:if="${hint == null}" method="post" th:action="@{/lists/{id}/test/hint(id=${listId})}">
+    <button type="submit" class="secondary">Show first letter</button>
+</form>
 
 <form method="post" th:action="@{/lists/{id}/test/answer(id=${listId})}">
     <label>Your answer

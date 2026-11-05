@@ -16,6 +16,7 @@ public class TestSession implements Serializable {
     private final List<Long> itemIds;
     private final List<Long> wrongItemIds = new ArrayList<>();
     private int index;
+    private boolean hintShown;
 
     /** @param itemIds the item ids in the order they will be asked */
     public TestSession(Long listId, Direction direction, List<Long> itemIds) {
@@ -59,6 +60,16 @@ public class TestSession implements Serializable {
             wrongItemIds.add(itemId);
         }
         index++;
+        hintShown = false;
+    }
+
+    /** Whether the user asked for a hint on the current question. Hints do not change the score. */
+    public boolean isHintShown() {
+        return hintShown;
+    }
+
+    public void showHint() {
+        hintShown = true;
     }
 
     public List<Long> getWrongItemIds() {

@@ -186,3 +186,18 @@ li form button {
         padding: 2rem;
     }
 }
+
+/* Test hints */
+.hint {
+    font-size: 1.1rem;
+}
+
+button.secondary {
+    background: #eef;
+    color: inherit;
+}
+
+.muted {
+    color: #666;
+    font-size: 0.9em;
+}

@@ -65,7 +65,18 @@ public class TestController {
         model.addAttribute("prompt", testService.prompt(item, test.getDirection()));
         model.addAttribute("position", test.position());
         model.addAttribute("total", test.total());
+        model.addAttribute("hint", test.isHintShown() ? testService.hint(item, test.getDirection()) : null);
         return "question";
+    }
+
+    /** Shows the first letter of the expected answer for the current question. */
+    @PostMapping("/hint")
+    public String hint(@PathVariable Long listId, HttpSession session) {
+        TestSession test = activeSession(session, listId);
+        if (test != null && !test.isFinished()) {
+            test.showHint();
+        }
+        return "redirect:/lists/" + listId + "/test/question";
     }
 
     /** Checks the answer, then shows feedback on the next page (flash attributes). */

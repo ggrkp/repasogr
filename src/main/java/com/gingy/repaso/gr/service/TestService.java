@@ -7,9 +7,11 @@ import com.gingy.repaso.gr.domain.WordList;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class TestService {
@@ -37,8 +39,25 @@ public class TestService {
         return direction == Direction.EL_TO_ES ? item.getGreek() : item.getSpanish();
     }
 
+    /**
+     * The answer shown when the user is wrong. Spanish to Greek accepts any Greek translation of the word,
+     * so the full list is joined with commas (AnswerChecker splits on commas).
+     */
     public String expected(ListItem item, Direction direction) {
-        return direction == Direction.EL_TO_ES ? item.getSpanish() : item.getGreek();
+        return direction == Direction.EL_TO_ES ? item.getSpanish() : String.join(", ", item.getGreekTranslations());
+    }
+
+    /**
+     * The first letter of each accepted answer, e.g. "σ" or "σ / ο". Helps tell apart two words that
+     * share a translation, since each one starts with a different letter.
+     */
+    public String hint(ListItem item, Direction direction) {
+        return Arrays.stream(expected(item, direction).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> new String(Character.toChars(s.codePointAt(0))))
+                .distinct()
+                .collect(Collectors.joining(" / "));
     }
 
     public boolean check(ListItem item, Direction direction, String answer) {
