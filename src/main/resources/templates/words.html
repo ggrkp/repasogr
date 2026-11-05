@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" th:href="@{/style.css}">
+    <title>My words</title>
+</head>
+<body>
+<div th:replace="~{layout :: navbar}"></div>
+<main class="container">
+<h1>My words</h1>
+<p>Words you typed yourself, including every custom translation you added to a list. Changing a word here does not change lists that already have it.</p>
+
+<p th:if="${message}" th:text="${message}" class="message"></p>
+<p th:if="${error}" th:text="${error}" class="error"></p>
+
+<h2>Search</h2>
+<form method="get" th:action="@{/words}" class="inline-form">
+    <label>Greek or Spanish
+        <input type="text" name="q" th:value="${q}">
+    </label>
+    <button type="submit">Search</button>
+    <a th:if="${!q.isEmpty()}" th:href="@{/words}">Show all</a>
+</form>
+
+<h2>Add a word</h2>
+<form method="post" th:action="@{/words}" class="inline-form">
+    <label>Greek
+        <input type="text" name="greek">
+    </label>
+    <label>Spanish
+        <input type="text" name="spanish">
+    </label>
+    <button type="submit">Save word</button>
+</form>
+
+<h2 th:text="${q.isEmpty()} ? 'All my words' : 'Results'">My words</h2>
+<p th:if="${words.isEmpty()}" th:text="${q.isEmpty()} ? 'No words yet.' : 'No words match.'"></p>
+
+<table th:unless="${words.isEmpty()}">
+    <thead>
+    <tr><th>Greek and Spanish (edit in place)</th><th></th></tr>
+    </thead>
+    <tbody>
+    <tr th:each="word : ${words}">
+        <td>
+            <form method="post" th:action="@{/words/{id}(id=${word.id})}" class="inline-form">
+                <input type="hidden" name="q" th:value="${q}">
+                <input type="text" name="greek" th:value="${word.greek}" aria-label="Greek">
+                <input type="text" name="spanish" th:value="${word.spanish}" aria-label="Spanish">
+                <button type="submit">Save</button>
+            </form>
+        </td>
+        <td>
+            <form method="post" th:action="@{/words/{id}/delete(id=${word.id})}"
+                  th:onsubmit="return confirm('Delete this word from My words?')">
+                <input type="hidden" name="q" th:value="${q}">
+                <button type="submit">Delete</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</main>
+</body>
+</html>
