@@ -14,6 +14,6 @@ public interface WordListRepository extends JpaRepository<WordList, Long> {
 
     boolean existsByName(String name);
 
-    @EntityGraph(attributePaths = {"items", "items.extraGreek"})
+    @EntityGraph(attributePaths = "items")
     Optional<WordList> findWithItemsById(Long id);
 }

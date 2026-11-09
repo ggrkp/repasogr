@@ -12,9 +12,11 @@ import org.springframework.context.annotation.Import;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest
 @Import({WordListService.class, DictionaryService.class, TeiDictionaryParser.class, OwnWordService.class})
@@ -159,78 +161,6 @@ class WordListServiceTest {
         assertThatThrownBy(() -> service.addCustomItem(list.getId(), "ψωμί", "  "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Both the Greek and the Spanish word are required.");
-    }
-
-    @Test
-    void addsExtraGreekTranslationsUpToThreeInTotal() {
-        WordList list = service.create("Translations");
-        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
-        entityManager.flush(); // assign the id, as a committed request would have
-
-        service.addGreekTranslation(list.getId(), item.getId(), " οικία ");
-        service.addGreekTranslation(list.getId(), item.getId(), "σπιτάκι");
-
-        ListItem stored = service.findWithItems(list.getId()).orElseThrow().getItems().get(0);
-        assertThat(stored.getGreekTranslations()).containsExactly("σπίτι", "οικία", "σπιτάκι");
-        assertThat(stored.getExtraGreek()).containsExactly("οικία", "σπιτάκι");
-    }
-
-    @Test
-    void fourthGreekTranslationIsRejected() {
-        WordList list = service.create("Four");
-        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
-        entityManager.flush();
-        service.addGreekTranslation(list.getId(), item.getId(), "οικία");
-        service.addGreekTranslation(list.getId(), item.getId(), "σπιτάκι");
-
-        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), item.getId(), "τέσσερα"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Each Spanish word can have up to 3 Greek translations.");
-    }
-
-    @Test
-    void duplicateGreekTranslationIsRejected() {
-        WordList list = service.create("Dup translation");
-        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
-        entityManager.flush();
-
-        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), item.getId(), "ΣΠΙΤΙ"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("That Greek translation is already listed for this word.");
-    }
-
-    @Test
-    void blankGreekTranslationIsRejected() {
-        WordList list = service.create("Blank translation");
-        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
-        entityManager.flush();
-
-        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), item.getId(), "   "))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("The Greek translation cannot be blank.");
-    }
-
-    @Test
-    void removesExtraGreekTranslationByPosition() {
-        WordList list = service.create("Remove translation");
-        ListItem item = service.addItem(list.getId(), "σπίτι", "casa");
-        entityManager.flush();
-        service.addGreekTranslation(list.getId(), item.getId(), "οικία");
-        service.addGreekTranslation(list.getId(), item.getId(), "σπιτάκι");
-
-        service.removeGreekTranslation(list.getId(), item.getId(), 0);
-
-        ListItem stored = service.findWithItems(list.getId()).orElseThrow().getItems().get(0);
-        assertThat(stored.getGreekTranslations()).containsExactly("σπίτι", "σπιτάκι");
-    }
-
-    @Test
-    void greekTranslationOnWordNotInListIsRejected() {
-        WordList list = service.create("No word");
-
-        assertThatThrownBy(() -> service.addGreekTranslation(list.getId(), 424_242L, "ένα"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("That word is not in this list.");
     }
 
     @Test
@@ -435,4 +365,54 @@ class WordListServiceTest {
                 .hasMessage("A list named \"Dos\" already exists.");
     }
 
+    @Test
+    void combinedListHasEveryWordOfTheChosenListsAndKeepsEachPairOnce() {
+        WordList first = service.create("Primera");
+        service.addCustomItem(first.getId(), "σπίτι", "casa");
+        service.addCustomItem(first.getId(), "γάτα", "gato");
+        WordList second = service.create("Segunda");
+        service.addCustomItem(second.getId(), "ΣΠΊΤΙ", "Casa");
+        service.addCustomItem(second.getId(), "νερό", "agua");
+
+        WordList combined = service.createCombined("Juntas", List.of(first.getId(), second.getId()));
+
+        WordList loaded = service.findWithItems(combined.getId()).orElseThrow();
+        assertThat(loaded.getName()).isEqualTo("Juntas");
+        assertThat(loaded.getItems()).extracting(ListItem::getGreek, ListItem::getSpanish)
+                .containsExactly(
+                        tuple("σπίτι", "casa"),
+                        tuple("γάτα", "gato"),
+                        tuple("νερό", "agua"));
+    }
+
+    @Test
+    void combiningDoesNotChangeTheSourceLists() {
+        WordList first = service.create("Origen");
+        service.addCustomItem(first.getId(), "γάτα", "gato");
+
+        service.createCombined("Copia", List.of(first.getId()));
+
+        assertThat(service.findWithItems(first.getId()).orElseThrow().getItems())
+                .extracting(ListItem::getSpanish).containsExactly("gato");
+    }
+
+    @Test
+    void combineRejectsBlankNameDuplicateNameNoListsAndUnknownList() {
+        WordList first = service.create("Uno");
+        service.create("Ocupado");
+
+        assertThatThrownBy(() -> service.createCombined(" ", List.of(first.getId())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("List name cannot be blank.");
+        assertThatThrownBy(() -> service.createCombined("Ocupado", List.of(first.getId())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A list named \"Ocupado\" already exists.");
+        assertThatThrownBy(() -> service.createCombined("Nueva", List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Choose at least one list to combine.");
+        assertThatThrownBy(() -> service.createCombined("Nueva", List.of(999L)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("List not found.");
+    }
 }
+

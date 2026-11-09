@@ -81,7 +81,7 @@
 
 <table th:unless="${list.items.isEmpty()}">
     <thead>
-    <tr><th>Greek and Spanish (edit in place)</th><th>More Greek translations (up to 3 in total)</th><th></th></tr>
+    <tr><th>Greek and Spanish (edit in place)</th><th></th></tr>
     </thead>
     <tbody>
     <tr th:each="item : ${list.items}">
@@ -90,24 +90,6 @@
                 <input type="text" name="greek" th:value="${item.greek}" aria-label="Greek">
                 <input type="text" name="spanish" th:value="${item.spanish}" aria-label="Spanish">
                 <button type="submit">Save</button>
-            </form>
-        </td>
-        <td>
-            <ol>
-                <li th:each="translation, stat : ${item.extraGreek}">
-                    <span th:text="${translation}"></span>
-                    <form method="post" class="inline-form"
-                          th:action="@{/lists/{id}/items/{itemId}/greek-translations/{index}/delete(id=${list.id},itemId=${item.id},index=${stat.index})}"
-                          th:onsubmit="return confirm('Remove this Greek translation?')">
-                        <button type="submit">Remove</button>
-                    </form>
-                </li>
-            </ol>
-            <form method="post" th:if="${item.greekTranslations.size() lt 3}"
-                  th:action="@{/lists/{id}/items/{itemId}/greek-translations(id=${list.id},itemId=${item.id})}"
-                  class="inline-form">
-                <input type="text" name="text" placeholder="Another Greek word" aria-label="Another Greek translation">
-                <button type="submit">Add translation</button>
             </form>
         </td>
         <td>

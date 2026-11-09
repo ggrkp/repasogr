@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -35,12 +36,31 @@ public class ListController {
                             Model model) {
         String q = query == null ? "" : query.trim();
         model.addAttribute("lists", wordListService.findFiltered(q, sort));
+        model.addAttribute("allLists", wordListService.findAll()); // the combine form always offers every list
         model.addAttribute("q", q);
         model.addAttribute("sort", "words".equals(sort) ? "words" : "name");
         return "lists";
     }
 
     /** Post/Redirect/Get: on success or error, redirect back to the page. */
+    /** Creates a list holding the words of the chosen lists, then opens the new list. */
+    @PostMapping("/combine")
+    public String combineLists(@RequestParam(name = "name", defaultValue = "") String name,
+                               @RequestParam(name = "sourceIds", required = false) List<Long> sourceIds,
+                               RedirectAttributes redirect) {
+        try {
+            WordList combined = wordListService.createCombined(name, sourceIds);
+            int count = new HashSet<>(sourceIds).size();
+            redirect.addFlashAttribute("message", "List created from " + count
+                    + (count == 1 ? " list." : " lists."));
+            return "redirect:/lists/" + combined.getId();
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+            redirect.addFlashAttribute("name", name);
+            return "redirect:/lists";
+        }
+    }
+
     @PostMapping
     public String createList(@RequestParam(name = "name", defaultValue = "") String name,
                              RedirectAttributes redirect) {
@@ -95,34 +115,6 @@ public class ListController {
         try {
             wordListService.addCustomItem(id, greek, spanish);
             redirect.addFlashAttribute("message", "Word added.");
-        } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("error", e.getMessage());
-        }
-        return "redirect:/lists/" + id;
-    }
-
-    @PostMapping("/{id}/items/{itemId}/greek-translations")
-    public String addGreekTranslation(@PathVariable Long id,
-                                @PathVariable Long itemId,
-                                @RequestParam(name = "text", defaultValue = "") String text,
-                                RedirectAttributes redirect) {
-        findListOr404(id);
-        try {
-            wordListService.addGreekTranslation(id, itemId, text);
-        } catch (IllegalArgumentException e) {
-            redirect.addFlashAttribute("error", e.getMessage());
-        }
-        return "redirect:/lists/" + id;
-    }
-
-    @PostMapping("/{id}/items/{itemId}/greek-translations/{index}/delete")
-    public String removeGreekTranslation(@PathVariable Long id,
-                                   @PathVariable Long itemId,
-                                   @PathVariable int index,
-                                   RedirectAttributes redirect) {
-        findListOr404(id);
-        try {
-            wordListService.removeGreekTranslation(id, itemId, index);
         } catch (IllegalArgumentException e) {
             redirect.addFlashAttribute("error", e.getMessage());
         }

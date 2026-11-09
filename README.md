@@ -16,7 +16,6 @@ A small web app for creating word lists and testing yourself on them, in either 
 - **Add your own word** when the dictionary has no entry for it. Your text is saved as typed, and the pair is also kept in My words so it can be found by search later.
 - **Edit a word in place** (Greek and Spanish). A pair that is already in the list, ignoring case and accents, is rejected.
 - **Remove a word** from the list, after a confirmation prompt.
-- **Extra Greek translations:** a Spanish word can have up to 3 Greek translations in total. Add or remove the extra ones, with a confirmation prompt on removal.
 
 ### My words (`/words`)
 - Shows every word pair you have typed yourself.

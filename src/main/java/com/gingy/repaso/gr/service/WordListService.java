@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -96,6 +97,42 @@ public class WordListService {
      */
     @Transactional
     public WordList create(String rawName) {
+        return repository.save(new WordList(validNewName(rawName)));
+    }
+
+    /**
+     * Creates a list holding every word of the given lists (a union). A word pair that appears in
+     * several of the lists is kept once. The source lists are not changed.
+     *
+     * @throws IllegalArgumentException if the name is blank or used, no list is chosen, or a list does not exist
+     */
+    @Transactional
+    public WordList createCombined(String rawName, List<Long> sourceListIds) {
+        String name = validNewName(rawName);
+        if (sourceListIds == null || sourceListIds.isEmpty()) {
+            throw new IllegalArgumentException("Choose at least one list to combine.");
+        }
+        List<WordList> sources = new ArrayList<>();
+        for (Long id : new LinkedHashSet<>(sourceListIds)) {
+            sources.add(repository.findWithItemsById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("List not found.")));
+        }
+
+        WordList combined = repository.save(new WordList(name));
+        for (WordList source : sources) {
+            for (ListItem item : source.getItems()) {
+                boolean alreadyCopied = combined.getItems().stream()
+                        .anyMatch(i -> samePair(i, item.getGreek(), item.getSpanish()));
+                if (!alreadyCopied) {
+                    combined.addItem(item.getGreek(), item.getSpanish());
+                }
+            }
+        }
+        return combined;
+    }
+
+    /** Trims and checks a new list name: not blank and not used by another list. */
+    private String validNewName(String rawName) {
         String name = clean(rawName);
         if (name.isEmpty()) {
             throw new IllegalArgumentException("List name cannot be blank.");
@@ -103,7 +140,7 @@ public class WordListService {
         if (repository.existsByName(name)) {
             throw new IllegalArgumentException("A list named \"" + name + "\" already exists.");
         }
-        return repository.save(new WordList(name));
+        return name;
     }
 
     /**
@@ -182,37 +219,6 @@ public class WordListService {
             throw new IllegalArgumentException("This word pair is already in the list.");
         }
         item.update(greek, spanish);
-    }
-
-    /**
-     * Adds an extra Greek translation to a word in a list (at most {@link ListItem#MAX_GREEK_TRANSLATIONS} per word).
-     *
-     * @throws IllegalArgumentException if the list or word does not exist, the text is blank, or the word is full
-     */
-    @Transactional
-    public void addGreekTranslation(Long listId, Long itemId, String rawText) {
-        ListItem item = findItem(listId, itemId);
-        item.addGreekTranslation(clean(rawText));
-    }
-
-    /**
-     * Removes the extra Greek translation at the given position (0-based) from a word in a list.
-     *
-     * @throws IllegalArgumentException if the list or word does not exist, or there is no such translation
-     */
-    @Transactional
-    public void removeGreekTranslation(Long listId, Long itemId, int index) {
-        ListItem item = findItem(listId, itemId);
-        item.removeGreekTranslation(index);
-    }
-
-    private ListItem findItem(Long listId, Long itemId) {
-        WordList list = repository.findWithItemsById(listId)
-                .orElseThrow(() -> new IllegalArgumentException("List not found."));
-        return list.getItems().stream()
-                .filter(i -> i.getId().equals(itemId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("That word is not in this list."));
     }
 
     private static void requireNotInList(WordList list, String greek, String spanish) {

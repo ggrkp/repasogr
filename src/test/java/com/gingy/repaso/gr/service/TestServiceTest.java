@@ -11,43 +11,42 @@ class TestServiceTest {
 
     private final TestService testService = new TestService();
 
-    private static ListItem casaWithExtraGreek() {
-        ListItem item = new WordList("Casa").addItem("σπίτι", "casa");
-        item.addGreekTranslation("οικία");
-        return item;
-    }
-
     @Test
-    void spanishToGreekAcceptsAnyGreekTranslation() {
-        ListItem item = casaWithExtraGreek();
+    void spanishToGreekAcceptsOnlyTheGreekWord() {
+        ListItem item = new WordList("Casa").addItem("σπίτι", "casa");
 
         assertThat(testService.check(item, Direction.ES_TO_EL, "σπίτι")).isTrue();
-        assertThat(testService.check(item, Direction.ES_TO_EL, "οικία")).isTrue();
         assertThat(testService.check(item, Direction.ES_TO_EL, "γάτα")).isFalse();
     }
 
     @Test
-    void spanishToGreekShowsAllGreekTranslationsWhenWrong() {
-        assertThat(testService.expected(casaWithExtraGreek(), Direction.ES_TO_EL)).isEqualTo("σπίτι, οικία");
+    void spanishToGreekShowsTheGreekWordWhenWrong() {
+        ListItem item = new WordList("Casa").addItem("σπίτι", "casa");
+
+        assertThat(testService.expected(item, Direction.ES_TO_EL)).isEqualTo("σπίτι");
     }
 
     @Test
-    void greekToSpanishStillExpectsTheSpanishWord() {
-        ListItem item = casaWithExtraGreek();
+    void greekToSpanishExpectsTheSpanishWord() {
+        ListItem item = new WordList("Casa").addItem("σπίτι", "casa");
 
         assertThat(testService.expected(item, Direction.EL_TO_ES)).isEqualTo("casa");
         assertThat(testService.check(item, Direction.EL_TO_ES, "casa")).isTrue();
-        assertThat(testService.check(item, Direction.EL_TO_ES, "οικία")).isFalse();
+        assertThat(testService.check(item, Direction.EL_TO_ES, "σπίτι")).isFalse();
     }
 
     @Test
-    void hintGivesFirstLetterOfEachAcceptedGreekAnswer() {
-        assertThat(testService.hint(casaWithExtraGreek(), Direction.ES_TO_EL)).isEqualTo("σ / ο");
+    void hintForGreekAnswerIsItsFirstLetter() {
+        ListItem item = new WordList("Casa").addItem("σπίτι", "casa");
+
+        assertThat(testService.hint(item, Direction.ES_TO_EL)).isEqualTo("σ");
     }
 
     @Test
     void hintForSpanishAnswerIsItsFirstLetter() {
-        assertThat(testService.hint(casaWithExtraGreek(), Direction.EL_TO_ES)).isEqualTo("c");
+        ListItem item = new WordList("Casa").addItem("σπίτι", "casa");
+
+        assertThat(testService.hint(item, Direction.EL_TO_ES)).isEqualTo("c");
     }
 
     @Test

@@ -21,6 +21,24 @@
     <button type="submit">Create list</button>
 </form>
 
+<h2>Combine lists</h2>
+<p class="muted">Make a new list with all the words of the lists you tick. A word that is in several of them is kept once.</p>
+<form method="post" th:action="@{/lists/combine}" th:unless="${allLists.isEmpty()}">
+    <label>New list name
+        <input type="text" name="name">
+    </label>
+    <fieldset>
+        <legend>Lists to combine</legend>
+        <label th:each="source : ${allLists}" class="checkbox">
+            <input type="checkbox" name="sourceIds" th:value="${source.id}">
+            <span th:text="${source.name}"></span>
+            <span class="muted" th:text="'(' + ${source.items.size()} + ' ' + (${source.items.size() == 1} ? 'word)' : 'words)')"></span>
+        </label>
+    </fieldset>
+    <button type="submit">Create combined list</button>
+</form>
+<p th:if="${allLists.isEmpty()}">Create at least one list first.</p>
+
 <h2>Your lists</h2>
 <form method="get" th:action="@{/lists}" class="inline-form">
     <label>Filter by name

@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -143,28 +144,6 @@ class ListControllerTest {
     }
 
     @Test
-    void addsGreekTranslationAndRedirectsToList() throws Exception {
-        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
-
-        mvc.perform(post("/lists/1/items/5/greek-translations").param("text", "οικία"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/lists/1"));
-
-        verify(service).addGreekTranslation(1L, 5L, "οικία");
-    }
-
-    @Test
-    void removesGreekTranslationByIndex() throws Exception {
-        given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
-
-        mvc.perform(post("/lists/1/items/5/greek-translations/2/delete"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/lists/1"));
-
-        verify(service).removeGreekTranslation(1L, 5L, 2);
-    }
-
-    @Test
     void rejectedItemShowsErrorAndKeepsInput() throws Exception {
         given(service.findWithItems(anyLong())).willReturn(Optional.of(new WordList("Verbos")));
         doThrow(new IllegalArgumentException("\"σπίτι\" = \"perro\" is not in the dictionary."))
@@ -262,4 +241,28 @@ class ListControllerTest {
                 .andExpect(flash().attribute("error", "List name cannot be blank."));
     }
 
+    @Test
+    void combinesListsAndRedirectsToNewList() throws Exception {
+        WordList created = mock(WordList.class);
+        given(created.getId()).willReturn(5L);
+        given(service.createCombined("Juntas", List.of(1L, 2L))).willReturn(created);
+
+        mvc.perform(post("/lists/combine").param("name", "Juntas").param("sourceIds", "1", "2"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/lists/5"));
+
+        verify(service).createCombined("Juntas", List.of(1L, 2L));
+    }
+
+    @Test
+    void showsErrorWhenCombiningFails() throws Exception {
+        doThrow(new IllegalArgumentException("Choose at least one list to combine."))
+                .when(service).createCombined(anyString(), any());
+
+        mvc.perform(post("/lists/combine").param("name", "Juntas"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/lists"))
+                .andExpect(flash().attribute("error", "Choose at least one list to combine."));
+    }
 }
+
